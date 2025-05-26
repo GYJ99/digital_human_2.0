@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Human Interface</title>
+    <!-- Three.js 库 (Three.js Library) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.128.0/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        /* --- 整体页面与字体定义 (Overall Page & Font Definition) --- */
+        body, html {
+            height: 100%; /* 确保html和body占据全部视口高度 (Ensure html and body take full viewport height) */
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* 更现代的无衬线字体 (More modern sans-serif font) */
+            background-color: #f4f7f6; /* 整体页面背景色 (Overall page background color) */
+            color: #333; /* 默认文字颜色 (Default text color) */
+            font-size: 16px; /* 基准字体大小 (Base font size) */
+        }
+
+        /* --- 主容器Flex布局 (Main Container Flex Layout) --- */
+        .main-container {
+            display: flex;
+            height: 100vh; /* 使用视口高度单位 (Use viewport height unit) */
+            width: 100%;
+        }
+
+        /* --- 数字人容器 (Digital Human Container) --- */
+        #digital-human-container {
+            width: 50%;
+            height: 100%;
+            background-color: #1e1e1e; /* 较暗的背景以突出3D模型 (Darker background for 3D model prominence) */
+            border-right: 1px solid #d0d0d0; /* 容器间的细分隔线 (Subtle separator line) */
+            box-sizing: border-box;
+            position: relative; 
+            overflow: hidden; 
+        }
+        /* 移除默认的 <p>Digital Human Display Area</p> 标签的显示 (Remove display of default p tag) */
+        #digital-human-container > p {
+            display: none;
+        }
+
+
+        /* --- 聊天容器 (Chat Container) --- */
+        #chat-container {
+            width: 50%;
+            height: 100%;
+            background-color: #ffffff; /* 聊天区域使用白色背景 (White background for chat area) */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            padding: 0; /* 移除内边距，由子元素控制 (Remove padding, controlled by children) */
+        }
+
+        /* --- 聊天消息显示区域 (Chat Messages Display Area) --- */
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px; /* 增加内边距 (Increased padding) */
+            overflow-y: auto; /* 允许内容滚动 (Allow content to scroll) */
+            display: flex; /* 使用flex布局来管理消息对齐 (Use flex for message alignment) */
+            flex-direction: column; /* 消息垂直排列 (Messages stack vertically) */
+            gap: 12px; /* 消息间的间隙 (Gap between messages) */
+        }
+        /* 移除初始的 <p>Welcome...</p> 标签的默认边距和特定样式 (Remove default margin and style for initial p tag) */
+        .chat-messages > p:first-child {
+            margin: 0 auto; /* 居中并移除上下边距 (Center and remove top/bottom margin) */
+            padding: 10px 0; /* 添加一些上下内边距 (Add some top/bottom padding) */
+            color: #888; /* 柔和的文字颜色 (Softer text color) */
+            font-style: italic;
+            text-align: center;
+            font-size: 0.9em; /* 稍小字体 (Slightly smaller font) */
+        }
+
+
+        /* --- 单条消息样式 (Individual Message Styling) --- */
+        .message { /* 通用消息样式 (Common message style) */
+            padding: 10px 15px; /* 消息内边距 (Padding within messages) */
+            border-radius: 18px; /* 更圆润的边角 (Softer rounded corners) */
+            max-width: 75%; /* 消息最大宽度 (Max width for messages) */
+            line-height: 1.5; /* 改善可读性 (Improved readability) */
+            word-wrap: break-word; /* 确保长单词换行 (Ensure long words wrap) */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.07); /* 轻微阴影 (Subtle shadow) */
+        }
+
+        .user-message { /* 用户消息特定样式 (User message specific style) */
+            background-color: #007bff; /* 鲜明的用户消息颜色 (Distinct user message color) */
+            color: white;
+            align-self: flex-end; /* 用户消息靠右 (User messages align to the right) */
+            margin-left: auto; 
+            border-bottom-right-radius: 5px; /* 调整特定边角以形成对话气泡感 (Adjust specific corner for bubble feel) */
+        }
+
+        .dify-message { /* Dify(AI)消息特定样式 (Dify(AI) message specific style) */
+            background-color: #e9ecef; /* AI消息使用浅灰色 (Light grey for AI messages) */
+            color: #212529; /* 深灰色文字以保证对比度 (Darker grey text for contrast) */
+            align-self: flex-start; /* AI消息靠左 (AI messages align to the left) */
+            margin-right: auto;
+            border-bottom-left-radius: 5px; /* 调整特定边角 (Adjust specific corner) */
+        }
+        
+        /* --- 聊天输入区域 (Chat Input Area) --- */
+        .chat-input {
+            padding: 15px 20px; /* 输入区域内边距 (Padding for input area) */
+            display: flex;
+            align-items: center; /* 垂直居中对齐输入框和按钮 (Vertically align input and buttons) */
+            border-top: 1px solid #e0e0e0; /* 输入区域顶部分隔线 (Separator line above input area) */
+            background-color: #f8f9fa; /* 输入区域背景色 (Background color for input area) */
+        }
+
+        .chat-input input[type="text"] {
+            flex-grow: 1;
+            padding: 12px 18px; /* 输入框内边距 (Padding within input field) */
+            border: 1px solid #ced4da; /* 边框颜色 (Border color) */
+            border-radius: 22px; /* 更圆润的输入框 (More rounded input field) */
+            font-size: 1rem; /* 字体大小 (Font size) */
+            margin-right: 10px; /* 与按钮的间距 (Spacing from buttons) */
+            outline: none; /* 移除默认焦点轮廓 (Remove default focus outline) */
+            transition: border-color 0.2s ease, box-shadow 0.2s ease; /* 平滑过渡效果 (Smooth transition effect) */
+        }
+        .chat-input input[type="text"]:focus {
+            border-color: #80bdff; /* 焦点时边框颜色 (Border color on focus) */
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); /* 焦点时阴影 (Shadow on focus) */
+        }
+
+        .chat-input button {
+            padding: 10px 18px; /* 按钮内边距 (Button padding) */
+            border: none;
+            border-radius: 22px; /* 圆润按钮 (Rounded buttons) */
+            background-color: #007bff; /* 按钮背景色 (Button background color) */
+            color: white;
+            font-size: 1rem; /* 字体大小 (Font size) */
+            cursor: pointer;
+            transition: background-color 0.2s ease; /* 平滑过渡效果 (Smooth transition effect) */
+            display: flex; /* 用于居中图标和文本（如果未来有）(For centering icon and text if any in future) */
+            align-items: center;
+            justify-content: center;
+        }
+        .chat-input button#mic-button { /* 麦克风按钮特定样式 (Mic button specific style) */
+            background-color: #6c757d; /* 麦克风按钮使用不同颜色 (Different color for mic button) */
+            margin-left: 8px; /* 调整与发送按钮的间距 (Adjust spacing from send button) */
+            padding: 10px 12px; /* 调整麦克风按钮的 padding 使其更像圆形 (Adjust mic button padding to be more circular) */
+        }
+        .chat-input button#mic-button:hover {
+            background-color: #5a6268; /* 麦克风按钮悬停颜色 (Mic button hover color) */
+        }
+        .chat-input button#mic-button.recording { /* 录音状态下的麦克风按钮 (Mic button when recording) */
+            background-color: #dc3545; /* 红色表示录音中 (Red to indicate recording) */
+            box-shadow: 0 0 8px rgba(220, 53, 69, 0.7); /* 录音时发光效果 (Glowing effect when recording) */
+        }
+
+        .chat-input button:hover {
+            background-color: #0056b3; /* 按钮悬停背景色 (Button hover background color) */
+        }
+        
+        /* --- 滚动条美化 (Scrollbar Prettification - WebKit Browsers) --- */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px; /* 滚动条宽度 (Scrollbar width) */
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f8f9fa; /* 滚动条轨道背景 (Scrollbar track background) */
+            border-radius: 10px; /* 轨道圆角 (Track border radius) */
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #ced4da; /* 滚动条滑块颜色 (Scrollbar thumb color) */
+            border-radius: 10px; /* 滑块圆角 (Thumb border radius) */
+        }
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #adb5bd; /* 滑块悬停颜色 (Thumb hover color) */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div id="digital-human-container">
+            <!-- <p>Digital Human Display Area</p> --> <!-- This p tag is hidden by CSS -->
+        </div>
+        <div id="chat-container">
+            <div class="chat-messages" id="chat-messages-display">
+                <!-- Chat messages will appear here -->
+                <p>Welcome! Chat with the digital human.</p>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="user-input" placeholder="Type your message...">
+                <button id="send-button">Send</button>
+                <button id="mic-button">🎤</button> <!-- 麦克风按钮, 移除了内联样式 (Mic button, removed inline style) -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript代码将放在这里
+        // Dify Chat相关的DOM元素和常量 (Dify Chat related DOM elements and constants)
+        const chatMessagesDisplay = document.getElementById('chat-messages-display'); // 获取聊天消息显示区域的div
+        const userInput = document.getElementById('user-input'); // 获取用户输入框
+        const sendButton = document.getElementById('send-button'); // 获取发送按钮
+        const difyApiKey = 'app-Gs2XACPpISYGBMlyztY7dzGX'; // Dify API密钥
+        const difyBaseUrl = 'http://172.18.152.20/v1/chat-messages'; // Dify API基础URL
+        const userId = 'web-user'; // 静态用户ID
+
+        // STT (Speech-to-Text) 相关的DOM元素和常量 (STT related DOM elements and constants)
+        const micButton = document.getElementById('mic-button'); // 获取麦克风按钮
+        const STT_WEBSOCKET_URL = 'ws://localhost:8765/stt'; // ESPnet STT WebSocket服务URL (可配置) (ESPnet STT WebSocket service URL, configurable)
+        
+        // TTS (Text-to-Speech) 常量 (TTS constants)
+        const TTS_HTTP_URL = 'http://localhost:8766/tts'; // ESPnet TTS HTTP服务URL (可配置) (ESPnet TTS HTTP service URL, configurable)
+
+        // STT/TTS 共享的 AudioContext 和分析器 (Shared AudioContext and Analyser for STT/TTS)
+        let audioContext; // AudioContext实例 (AudioContext instance) - Shared for STT and TTS audio analysis
+        let ttsAnalyser = null; // TTS用的AnalyserNode (AnalyserNode for TTS)
+
+        // STT 状态变量 (STT state variables)
+        let sttWs; // WebSocket实例 (WebSocket instance)
+        let mediaStream; // MediaStream实例 (MediaStream instance from getUserMedia)
+        let scriptProcessor; // ScriptProcessorNode实例 (ScriptProcessorNode instance)
+        let isRecording = false; // 录音状态 (Recording state)
+        const TARGET_SAMPLE_RATE = 16000; // STT服务期望的采样率 (Target sample rate for STT service)
+        
+        // TTS 状态变量 (TTS state variables)
+        let currentTTSAudio = null; // 当前正在播放的TTS音频对象 (Current playing TTS audio object)
+        let ttsAudioSourceNode = null; // TTS 音频源节点 (TTS audio source node for analyser)
+
+
+        // 添加消息到聊天显示区域的辅助函数
+        // 参数: message (string) - 要显示的消息内容 (Parameter: message (string) - message content to display)
+        // 参数: sender (string) - 发送者 ('user' 或 'dify') (Parameter: sender (string) - sender ('user' or 'dify'))
+        function addMessageToChat(message, sender) {
+            const messageElement = document.createElement('div'); // 创建一个新的div元素来显示消息 (Create a new div element to display the message)
+            messageElement.classList.add('message'); // 添加 'message' 类 (Add 'message' class)
+            messageElement.classList.add(sender === 'user' ? 'user-message' : 'dify-message'); // 根据发送者添加特定的类 (Add specific class based on sender)
+            
+            const messageTextNode = document.createTextNode(message); // 创建文本节点 (Create a text node)
+            messageElement.appendChild(messageTextNode); // 将文本节点添加到消息元素中 (Append text node to message element)
+
+            chatMessagesDisplay.appendChild(messageElement); // 将消息元素添加到聊天显示区域 (Append message element to chat display area)
+            chatMessagesDisplay.scrollTop = chatMessagesDisplay.scrollHeight; // 滚动到底部以显示最新消息 (Scroll to bottom to show latest message)
+        }
+
+        // --- TTS (Text-to-Speech) 功能 ---
+        // (TTS Functionality)
+
+        // 将文本作为语音播放功能 (Function to play text as speech)
+        // 参数: text (string) - 需要转换为语音的文本 (Parameter: text (string) - text to be converted to speech)
+        async function playTextAsSpeech(text) {
+            if (!text || text.trim() === "") { // 如果文本为空或仅包含空格，则不执行任何操作 (If text is empty or only whitespace, do nothing)
+                console.log("TTS: 文本为空，不进行播放。"); // TTS: Text is empty, skipping playback.
+                return;
+            }
+
+            if (currentTTSAudio && !currentTTSAudio.paused) { // 如果当前有音频正在播放 (If there's currently playing audio)
+                currentTTSAudio.pause(); // 暂停当前音频 (Pause current audio)
+                console.log("TTS: 已暂停上一个音频。"); // TTS: Paused previous audio.
+                if (ttsAudioSourceNode) {
+                    ttsAudioSourceNode.disconnect(); // 断开旧的音频源 (Disconnect old audio source)
+                    ttsAudioSourceNode = null;
+                }
+                if (ttsAnalyser) {
+                    // ttsAnalyser.disconnect(); // 分析器通常连接到destination，除非要完全重置 (Analyser usually connected to destination, unless full reset)
+                    ttsAnalyser = null; // 重置分析器引用，以便动画循环知道停止 (Reset analyser reference so animation loop knows to stop)
+                }
+            }
+
+            const payload = { text: text }; // 准备请求体 (Prepare request body)
+            console.log("TTS: 发送请求到", TTS_HTTP_URL, "内容:", payload); // TTS: Sending request to URL with payload
+
+            try {
+                const response = await fetch(TTS_HTTP_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const audioBlob = await response.blob(); // 获取音频数据为Blob (Get audio data as Blob)
+                    console.log("TTS: 收到音频Blob, 类型:", audioBlob.type); // TTS: Received audio Blob, type:
+                    const audioUrl = URL.createObjectURL(audioBlob); // 创建对象URL (Create object URL)
+                    
+                    currentTTSAudio = new Audio(audioUrl); // 创建新的Audio对象 (Create new Audio object)
+                    
+                    // 初始化或复用AudioContext (Initialize or reuse AudioContext)
+                    if (!audioContext || audioContext.state === 'closed') {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log("TTS: 新建或重新创建了AudioContext。"); // TTS: New or recreated AudioContext.
+                    } else {
+                        console.log("TTS: 复用已有的AudioContext。"); // TTS: Reusing existing AudioContext.
+                    }
+
+                    // 创建音频分析设置 (Create audio analysis setup)
+                    ttsAudioSourceNode = audioContext.createMediaElementSource(currentTTSAudio); // 从audio元素创建源 (Create source from audio element)
+                    ttsAnalyser = audioContext.createAnalyser(); // 创建分析器 (Create analyser)
+                    ttsAnalyser.fftSize = 512; // 设置FFT大小 (Set FFT size)
+
+                    // 连接音频图: 源 -> 分析器 -> 输出(扬声器) (Connect audio graph: source -> analyser -> destination)
+                    ttsAudioSourceNode.connect(ttsAnalyser);
+                    ttsAnalyser.connect(audioContext.destination);
+                    
+                    currentTTSAudio.play().catch(e => console.error("TTS: 播放音频失败:", e)); // 播放音频并捕获可能的错误 (Play audio and catch potential errors)
+                    console.log("TTS: 开始播放音频并设置分析器。"); // TTS: Starting audio playback and setting up analyser.
+
+                    currentTTSAudio.onended = () => {
+                        console.log("TTS: 音频播放完毕。"); // TTS: Audio playback finished.
+                        URL.revokeObjectURL(audioUrl); // 释放对象URL资源 (Release object URL resources)
+                        currentTTSAudio = null; // 清理当前音频对象引用 (Clear current audio object reference)
+                        if (ttsAudioSourceNode) {
+                            ttsAudioSourceNode.disconnect(); // 断开音频源 (Disconnect audio source)
+                            ttsAudioSourceNode = null;
+                        }
+                        // ttsAnalyser.disconnect(); // 分析器通常连接到destination，不需要在这里断开，除非AudioContext关闭
+                        ttsAnalyser = null; // 指示动画循环停止更新口型 (Signal animation loop to stop updating lip sync)
+                        // 重置口型到静止状态 (Reset lip shape to resting state)
+                        if (loadedGltfModel && mouthShapeIndex !== undefined && loadedGltfModel.morphTargetInfluences) {
+                           loadedGltfModel.morphTargetInfluences[mouthShapeIndex] = 0;
+                        }
+                    };
+                    currentTTSAudio.onerror = (e) => {
+                        console.error("TTS: 音频播放错误。", e); // TTS: Audio playback error.
+                        URL.revokeObjectURL(audioUrl); // 即使出错也尝试释放资源 (Attempt to release resources even on error)
+                        currentTTSAudio = null;
+                        if (ttsAudioSourceNode) {
+                            ttsAudioSourceNode.disconnect();
+                            ttsAudioSourceNode = null;
+                        }
+                        ttsAnalyser = null;
+                        alert("无法播放TTS音频，请查看控制台。"); // Cannot play TTS audio, check console.
+                    };
+                } else {
+                    // 处理TTS API请求错误 (Handle TTS API request error)
+                    const errorText = await response.text();
+                    console.error('TTS API Error:', response.status, errorText); // TTS API错误 (TTS API Error)
+                    alert(`TTS服务错误: ${response.status}. ${errorText}`); // TTS service error
+                    ttsAnalyser = null; // 确保出错时也清空分析器引用 (Ensure analyser ref is cleared on error)
+                }
+            } catch (error) {
+                // 捕获fetch错误或其他网络错误 (Capture fetch error or other network errors)
+                console.error('TTS Fetch Error:', error); // TTS Fetch错误 (TTS Fetch Error)
+                alert('TTS请求失败，请检查网络或服务是否可用。'); // TTS request failed, check network or service availability.
+                ttsAnalyser = null; // 确保出错时也清空分析器引用 (Ensure analyser ref is cleared on error)
+            }
+        }
+
+
+        // 发送消息到Dify API的函数 (Function to send message to Dify API)
+        async function sendMessageToDify(messageText) {
+            // 准备API请求的body (Prepare API request body)
+            const requestBody = {
+                "inputs": {}, // 根据Dify API文档，这里可能需要特定的输入字段 (According to Dify API docs, specific input fields might be needed here)
+                "query": messageText, // 用户的消息文本 (User's message text)
+                "user": userId, // 用户的唯一标识符 (User's unique identifier)
+                "response_mode": "blocking" // 使用阻塞模式获取响应 (Use blocking mode to get response)
+            };
+
+            try {
+                // 发送fetch请求 (Send fetch request)
+                const response = await fetch(difyBaseUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${difyApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (response.ok) {
+                    const data = await response.json(); // 解析JSON响应 (Parse JSON response)
+                    const difyReply = data.answer || (data.data && data.data.answer) || "抱歉，我没有得到明确的回复。"; // 从Dify响应中提取答案，并提供备选方案 (Extract answer, provide fallback)
+                    addMessageToChat(difyReply, 'dify'); // 显示Dify的回复 (Display Dify's reply)
+                    playTextAsSpeech(difyReply); // 调用TTS功能播放Dify的回复 (Call TTS function to play Dify's reply)
+                } else {
+                    // 处理API请求错误 (Handle API request error)
+                    const errorData = await response.text(); // 获取文本形式的错误信息 (Get error message as text)
+                    console.error('Dify API Error:', response.status, errorData); // 在控制台打印错误信息 (Print error to console)
+                    addMessageToChat(`Dify API请求错误: ${response.status}. ${errorData}`, 'dify'); // 在聊天界面显示错误信息 (Display error in chat)
+                }
+            } catch (error) {
+                // 处理网络错误或其他fetch错误 (Handle network error or other fetch errors)
+                console.error('Fetch Error:', error); // 在控制台打印错误信息 (Print error to console)
+                addMessageToChat('发送消息时遇到网络错误。', 'dify'); // 在聊天界面显示网络错误信息 (Display network error in chat)
+            }
+        }
+
+        // 发送按钮的点击事件监听器 (Send button click event listener)
+        sendButton.addEventListener('click', () => {
+            const messageText = userInput.value.trim(); // 获取用户输入的消息文本，并去除首尾空格 (Get user input, trim whitespace)
+            if (messageText) { // 如果消息不为空 (If message is not empty)
+                addMessageToChat(messageText, 'user'); // 显示用户发送的消息 (Display user's message)
+                userInput.value = ''; // 清空输入框 (Clear input field)
+                sendMessageToDify(messageText); // 将消息发送到Dify API (Send message to Dify API)
+            }
+        });
+
+        // 用户输入框的键盘事件监听器 (处理Enter键) (User input keypress event listener for Enter key)
+        userInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') { // 如果按下的是Enter键 (If Enter key is pressed)
+                event.preventDefault(); // 阻止默认的Enter键行为 (例如表单提交) (Prevent default Enter behavior e.g., form submission)
+                sendButton.click(); // 触发发送按钮的点击事件 (Trigger send button click)
+            }
+        });
+
+        // --- STT (Speech-to-Text) 功能实现 ---
+
+        // 将Float32Array转换为Int16Array (PCM16) (Convert Float32Array to Int16Array (PCM16))
+        // 参数: input (Float32Array) - 输入的浮点音频数据 (Input Float32 audio data)
+        // 返回: Int16Array - 转换后的16位PCM数据 (Returned Int16 PCM data)
+        function floatTo16BitPCM(input) {
+            const output = new Int16Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+                const s = Math.max(-1, Math.min(1, input[i]));
+                output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            return output;
+        }
+
+        // 开始录音功能 (Start recording function)
+        async function startRecording() {
+            if (isRecording) return; // 如果已在录音，则不执行任何操作 (If already recording, do nothing)
+
+            try {
+                // 1. 请求麦克风权限 (Request microphone permission)
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // 2. 初始化WebSocket连接 (Initialize WebSocket connection)
+                sttWs = new WebSocket(STT_WEBSOCKET_URL);
+
+                sttWs.onopen = () => {
+                    console.log('STT WebSocket 连接成功。'); // STT WebSocket connection successful.
+                    // 发送开始信号，指明音频格式和采样率 (Send start signal, specifying audio format and sample rate)
+                    // 注意: 实际协议和采样率需与ESPnet服务器配置一致 (Note: Actual protocol and sample rate must match ESPnet server config)
+                    // 假设服务器期望接收16kHz的PCM16数据 (Assuming server expects 16kHz PCM16 data)
+                    sttWs.send(JSON.stringify({ 
+                        action: 'start', 
+                        'content-type': `audio/l16;rate=${TARGET_SAMPLE_RATE};channels=1` // 明确指定单声道
+                    }));
+                    micButton.textContent = '停止'; // 更改按钮文本为“停止” (Change button text to "Stop")
+                    micButton.style.backgroundColor = 'red'; // 更改按钮颜色 (Change button color)
+                    isRecording = true; // 设置录音状态 (Set recording state)
+                };
+
+                sttWs.onmessage = (event) => {
+                    // console.log('STT WebSocket 收到消息:', event.data); // Log received message
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.transcript) {
+                            if (data.final) {
+                                userInput.value = data.transcript; // 最终结果，替换输入框内容 (Final result, replace input field content)
+                                // 可以选择在这里自动发送消息
+                                // sendButton.click(); 
+                            } else {
+                                // 临时结果，可以先显示，或等最终结果 (Interim result, can be displayed or wait for final)
+                                // userInput.value = userInput.value.substring(0, userInput.selectionStart) + data.transcript + userInput.value.substring(userInput.selectionEnd);
+                                userInput.value = data.transcript; // 简单起见，直接替换 (For simplicity, directly replace)
+                            }
+                        }
+                        if (data.status === "ok" && data.message){ // ESPnet aSR server might send status messages
+                            console.log("STT Server status: ", data.message);
+                        }
+                    } catch (e) {
+                        console.error('解析STT消息失败:', e); // Failed to parse STT message
+                        // userInput.value = "STT: " + event.data; // 显示原始数据如果不是JSON (Display raw data if not JSON)
+                    }
+                };
+
+                sttWs.onerror = (error) => {
+                    console.error('STT WebSocket 错误:', error); // STT WebSocket error
+                    alert('STT WebSocket 连接错误。请检查服务是否运行，或查看控制台获取更多信息。'); // STT WebSocket connection error. Check if service is running or see console.
+                    stopRecording(); // 发生错误时停止录音 (Stop recording on error)
+                };
+
+                sttWs.onclose = (event) => {
+                    console.log('STT WebSocket 连接关闭。代码:', event.code, '原因:', event.reason); // STT WebSocket connection closed. Code, Reason
+                    stopRecording(); // 连接关闭时确保停止录音流程 (Ensure recording process is stopped when connection closes)
+                };
+
+                // 3. 设置音频处理 (Setup audio processing)
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 检查并可能重采样 (Check and potentially resample)
+                // 注意: 浏览器通常以44.1kHz或48kHz采样。ESPnet通常期望16kHz。
+                // 客户端重采样会增加复杂性。理想情况下，ESPnet服务器可以处理输入采样率或配置为期望的采样率。
+                // 此处我们假设服务器可以处理AudioContext的原始采样率，或者我们已在服务器端配置了正确的期望采样率。
+                // 如果必须在客户端重采样，需要一个重采样库或手动实现。
+                // 为简单起见，我们现在发送原始数据，并在'start'信号中指明了TARGET_SAMPLE_RATE，依赖服务器处理。
+                // 但更健壮的做法是确保发送的数据确实是TARGET_SAMPLE_RATE。
+                console.log(`AudioContext 采样率: ${audioContext.sampleRate}, STT目标采样率: ${TARGET_SAMPLE_RATE}`);
+                // if (audioContext.sampleRate !== TARGET_SAMPLE_RATE) {
+                //     console.warn(`音频采样率 (${audioContext.sampleRate}Hz) 与目标采样率 (${TARGET_SAMPLE_RATE}Hz) 不匹配。理想情况下应进行重采样。`);
+                //     // alert(`音频采样率 (${audioContext.sampleRate}Hz) 与目标采样率 (${TARGET_SAMPLE_RATE}Hz) 不匹配。识别效果可能受影响。`);
+                // }
+
+
+                const bufferSize = 4096; // 音频缓冲区大小 (Audio buffer size)
+                const inputChannels = 1; // 输入通道数 (Number of input channels)
+                const outputChannels = 1; // 输出通道数 (Number of output channels)
+
+                scriptProcessor = audioContext.createScriptProcessor(bufferSize, inputChannels, outputChannels);
+                
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                source.connect(scriptProcessor);
+                scriptProcessor.connect(audioContext.destination); // 需要连接到destination，即使不播放
+
+                scriptProcessor.onaudioprocess = (event) => {
+                    if (!isRecording || !sttWs || sttWs.readyState !== WebSocket.OPEN) {
+                        return;
+                    }
+                    const inputData = event.inputBuffer.getChannelData(0); // 获取左声道数据 (Get left channel data)
+                    
+                    // 将Float32Array转换为Int16Array (PCM)
+                    const pcmData = floatTo16BitPCM(inputData);
+                    sttWs.send(pcmData.buffer); // 发送PCM数据 (Send PCM data)
+                };
+
+            } catch (error) {
+                console.error('启动录音失败:', error); // Failed to start recording
+                alert('无法访问麦克风。请检查权限。错误: ' + error.message); // Unable to access microphone. Check permissions.
+                if (micButton) {
+                    micButton.textContent = '🎤'; // 重置按钮文本 (Reset button text)
+                    micButton.style.backgroundColor = ''; // 重置按钮颜色 (Reset button color)
+                }
+                isRecording = false; // 重置录音状态 (Reset recording state)
+            }
+        }
+
+        // 停止录音功能 (Stop recording function)
+        function stopRecording() {
+            if (!isRecording && (!sttWs || sttWs.readyState === WebSocket.CLOSED) && !mediaStream) {
+                // 如果不是正在录音，且WebSocket已关闭或未初始化，且mediaStream已清理，则避免重复操作
+                // console.log("录音已停止或未初始化。");
+                if (micButton) {
+                     micButton.textContent = '🎤';
+                     micButton.style.backgroundColor = '';
+                }
+                isRecording = false;
+                return;
+            }
+            
+            console.log("停止录音..."); // Stopping recording...
+            isRecording = false; // 先设置状态，避免onaudioprocess继续发送 (Set state first to prevent onaudioprocess from sending more)
+
+            if (sttWs && sttWs.readyState === WebSocket.OPEN) {
+                try {
+                    sttWs.send(JSON.stringify({ action: 'stop' })); // 发送停止信号 (Send stop signal)
+                    sttWs.close(1000, "客户端停止录音"); // 正常关闭 (Normal closure)
+                } catch (e) {
+                    console.error("发送停止信号或关闭WS时出错:", e);
+                }
+            }
+            sttWs = null; // 清理WebSocket实例 (Clean up WebSocket instance)
+
+            if (scriptProcessor) {
+                scriptProcessor.disconnect(); // 断开ScriptProcessorNode (Disconnect ScriptProcessorNode)
+                scriptProcessor.onaudioprocess = null; // 移除事件处理器 (Remove event handler)
+                scriptProcessor = null;
+            }
+            // mediaStreamSource 在 scriptProcessor 断开后会自动处理，但明确断开没有坏处
+            // if (mediaStreamSource) { // mediaStreamSource 变量在此代码中未全局定义，它是在startRecording中作为source使用的
+            //     // mediaStreamSource.disconnect(); 
+            //     // mediaStreamSource = null;
+            // }
+             if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close().then(() => {
+                    console.log("AudioContext已关闭"); // AudioContext closed
+                }).catch(e => console.error("关闭AudioContext时出错:", e));
+            }
+            audioContext = null;
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop()); // 停止麦克风音轨 (Stop microphone tracks)
+                mediaStream = null; // 清理MediaStream实例 (Clean up MediaStream instance)
+            }
+            
+            if (micButton) {
+                micButton.textContent = '🎤'; // 重置按钮文本 (Reset button text)
+                micButton.style.backgroundColor = ''; // 重置按钮颜色 (Reset button color)
+            }
+        }
+
+        // 麦克风按钮事件监听器 (Microphone button event listener)
+        micButton.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+
+
+        // --- Dify Chat 和 STT 共同使用的样式 ---
+        // (Styles used by both Dify Chat and STT)
+        // (Styles used by both Dify Chat and STT)
+        // 为消息添加一些基本样式，以便区分用户和Dify (Add basic styles for messages to differentiate user and Dify)
+        const styleElement = document.createElement('style'); // Renamed to avoid conflict with potential Three.js 'style'
+        styleElement.textContent = `
+            .message {
+                padding: 8px;
+                margin-bottom: 5px;
+                border-radius: 5px;
+                max-width: 80%;
+                word-wrap: break-word;
+            }
+            .user-message {
+                background-color: #007bff;
+                color: white;
+                align-self: flex-end; /* 用户消息靠右 (User message align right) */
+                margin-left: auto; /* 用户消息靠右 (User message align right) */
+            }
+            .dify-message {
+                background-color: #f0f0f0;
+                color: black;
+                align-self: flex-start; /* Dify消息靠左 (Dify message align left) */
+                margin-right: auto; /* Dify消息靠左 (Dify message align left) */
+            }
+            #chat-messages-display {
+                display: flex;
+                flex-direction: column;
+            }
+        `;
+        document.head.appendChild(styleElement);
+        // 初始欢迎消息的样式可能也需要调整，但以上样式主要针对动态添加的消息
+        // (Initial welcome message style might need adjustment, but above styles are for dynamically added messages)
+        // 可以考虑移除或调整初始的 <p>Welcome! ...</p> 标签，或者在JS中动态添加第一条欢迎消息
+        // (Consider removing/adjusting initial <p>Welcome!...</p> or adding it dynamically in JS)
+
+
+        // --- Three.js 数字人显示逻辑 ---
+        // (Three.js Digital Human Display Logic)
+        const humanContainer = document.getElementById('digital-human-container'); // 获取数字人容器 (Get digital human container)
+        let scene, camera, renderer, modelMixer, clock; // 声明场景、相机、渲染器、动画混合器、时钟 (Declare scene, camera, renderer, animation mixer, clock)
+        let loadedGltfModelScene = null; // 保存加载的GLTF模型场景的引用 (Store reference to the loaded GLTF model's scene)
+        let characterMeshForMorphs = null; // 保存用于口型同步的角色网格引用 (Store reference to the character mesh for morph targets)
+        let mouthShapeIndex = undefined; // 保存嘴部混合形状的索引 (Store index of the mouth blend shape)
+        const MOUTH_SHAPE_NAME_CANDIDATES = ['mouthOpen', 'jawOpen', 'mouth', 'MouthOpen', 'JawOpen', 'mouth_open', 'jaw_open', 'jaw_Open', 'Mouth_Open']; // 可能的嘴部混合形状名称 (Possible mouth blend shape names)
+
+        // 动画管理 (Animation Management)
+        let animationActions = {}; // 存储所有动画动作 (Store all animation actions)
+        let currentAction = null; // 当前播放的动画动作 (Current playing animation action)
+        const DEFAULT_ANIMATION_NAME = 'Idle'; // 默认动画名称 (Default animation name)
+        const LISTENING_ANIMATION_NAME = 'Survey'; // 聆听/思考动画名称 (Listening/Thinking animation name)
+        // 注意: 'Thinking' 动画在 RobotExpressive.glb 中可能不存在，'Survey' 是一个较好的替代品
+        // (Note: 'Thinking' animation might not exist in RobotExpressive.glb, 'Survey' is a good alternative)
+
+
+        function initThreeJS() {
+            // 1. 场景设置 (Scene Setup)
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x282c34); // 设置场景背景色 (Set scene background color)
+
+            // 2. 相机设置 (Camera Setup)
+            if (!humanContainer) { 
+                console.error("数字人容器 'digital-human-container' 未找到。Three.js 初始化中止。");
+                return;
+            }
+            camera = new THREE.PerspectiveCamera(75, humanContainer.clientWidth / humanContainer.clientHeight, 0.1, 1000);
+            camera.position.set(0, 1.6, 3); 
+            camera.lookAt(0, 1, 0); 
+
+            // 3. 渲染器设置 (Renderer Setup)
+            renderer = new THREE.WebGLRenderer({ antialias: true }); 
+            renderer.setSize(humanContainer.clientWidth, humanContainer.clientHeight); 
+            renderer.setPixelRatio(window.devicePixelRatio); 
+            renderer.shadowMap.enabled = true; 
+            renderer.outputEncoding = THREE.sRGBEncoding; 
+            humanContainer.appendChild(renderer.domElement); 
+
+            // 4. 光源设置 (Lighting Setup)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); 
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); 
+            directionalLight.position.set(5, 10, 7.5); 
+            directionalLight.castShadow = true; 
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            scene.add(directionalLight);
+            
+            // 5. 加载3D模型 (Load 3D Model)
+            const loader = new THREE.GLTFLoader();
+            const modelUrl = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/models/gltf/RobotExpressive/RobotExpressive.glb';
+            
+            loader.load(modelUrl, 
+                function (gltf) { 
+                    loadedGltfModelScene = gltf.scene; 
+                    loadedGltfModelScene.scale.set(0.7, 0.7, 0.7); 
+                    loadedGltfModelScene.position.set(0, 0, 0);   
+                    
+                    loadedGltfModelScene.traverse(function (child) {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.morphTargetDictionary && Object.keys(child.morphTargetDictionary).length > 0) {
+                                // 假设第一个找到的带morph targets的mesh是我们要控制的角色mesh
+                                // (Assume the first mesh found with morph targets is the character mesh we want to control)
+                                if (!characterMeshForMorphs) {
+                                    characterMeshForMorphs = child;
+                                    console.log("找到用于口型同步的角色网格 (Found character mesh for lip sync):", characterMeshForMorphs.name);
+                                    console.log("混合形状字典 (Morph Target Dictionary):", characterMeshForMorphs.morphTargetDictionary);
+                                    for (const nameCandidate of MOUTH_SHAPE_NAME_CANDIDATES) {
+                                        if (characterMeshForMorphs.morphTargetDictionary[nameCandidate] !== undefined) {
+                                            mouthShapeIndex = characterMeshForMorphs.morphTargetDictionary[nameCandidate];
+                                            console.log(`找到嘴部混合形状: '${nameCandidate}', 索引: ${mouthShapeIndex}`); 
+                                            if (!characterMeshForMorphs.morphTargetInfluences) {
+                                                characterMeshForMorphs.morphTargetInfluences = []; 
+                                            }
+                                            characterMeshForMorphs.morphTargetInfluences[mouthShapeIndex] = 0; 
+                                            break; 
+                                        }
+                                    }
+                                    if (mouthShapeIndex === undefined) {
+                                        console.warn("警告: 未在此网格中找到明确的嘴部混合形状。口型同步可能无法工作。"); 
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    scene.add(loadedGltfModelScene); 
+                    console.log("3D模型加载成功。"); 
+
+                    // 初始化动画混合器和动作 (Initialize animation mixer and actions)
+                    modelMixer = new THREE.AnimationMixer(loadedGltfModelScene);
+                    animationActions = {}; // 清空旧动作 (Clear old actions)
+                    console.log("可用的动画片段 (Available animation clips):");
+                    gltf.animations.forEach((clip) => {
+                        const action = modelMixer.clipAction(clip);
+                        animationActions[clip.name] = action;
+                        console.log(`- ${clip.name}`);
+                    });
+
+                    // 播放默认动画 (Play default animation)
+                    let defaultAnim = animationActions[DEFAULT_ANIMATION_NAME] || animationActions[Object.keys(animationActions)[0]]; // Fallback to first anim
+                    if (defaultAnim) {
+                        currentAction = defaultAnim;
+                        currentAction.play();
+                        console.log(`播放默认动画: ${currentAction.getClip().name}`);
+                    } else {
+                        console.warn("警告: 未找到默认动画，也无其他可用动画。");
+                    }
+                    clock = new THREE.Clock(); // 在动画设置完成后初始化时钟 (Initialize clock after animation setup)
+                }, 
+                undefined, 
+                function (error) { 
+                    console.error('3D模型加载失败:', error); 
+                    alert('无法加载3D模型，将使用备用模型。错误: ' + error.message); 
+                    loadFallbackModel(); 
+                }
+            );
+
+            // 6. 窗口大小调整处理 (Window Resize Handling)
+            window.addEventListener('resize', onWindowResize, false);
+
+            // 7. 启动渲染循环 (Start Render Loop)
+            animate();
+        }
+
+        function loadFallbackModel() {
+            // 创建一个简单的球体作为备用模型 (Create a simple sphere as a fallback model)
+            const geometry = new THREE.SphereGeometry(0.8, 32, 32); // 半径0.8米 (Radius 0.8m)
+            const material = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.5, metalness: 0.1 });
+            const placeholder = new THREE.Mesh(geometry, material);
+            placeholder.position.set(0, 1, 0); // 将球体放置在(0,1,0)位置 (Place sphere at (0,1,0))
+            placeholder.castShadow = true; // 备用模型也投射阴影 (Fallback model also casts shadow)
+            placeholder.receiveShadow = true;
+            scene.add(placeholder);
+            console.log("已加载备用球体模型。"); // Fallback sphere model loaded.
+        }
+
+        function onWindowResize() {
+            // 更新相机宽高比 (Update camera aspect ratio)
+            camera.aspect = humanContainer.clientWidth / humanContainer.clientHeight;
+            camera.updateProjectionMatrix(); // 应用更改 (Apply changes)
+
+            // 更新渲染器尺寸 (Update renderer size)
+            renderer.setSize(humanContainer.clientWidth, humanContainer.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate); // 请求下一帧动画 (Request next animation frame)
+
+            if (modelMixer) { // 如果存在动画混合器 (If animation mixer exists)
+                modelMixer.update(clock.getDelta()); // 更新动画 (Update animation)
+            }
+
+            renderer.render(scene, camera); // 渲染场景 (Render the scene)
+        }
+
+        // DOM加载完成后初始化Three.js场景 (Initialize Three.js scene after DOM is loaded)
+        document.addEventListener('DOMContentLoaded', () => {
+            if (humanContainer) {
+                initThreeJS();
+            } else {
+                console.error("未找到数字人容器 'digital-human-container'。"); // Digital human container not found.
+            }
+        });
+
+        // --- 将需要测试的函数和变量附加到window对象 ---
+        // (Attaching functions and variables to the window object for testing)
+        window.floatTo16BitPCM = floatTo16BitPCM;
+        window.addMessageToChat = addMessageToChat;
+        window.playTextAsSpeech = playTextAsSpeech;
+        window.sendMessageToDify = sendMessageToDify; // 假设sendMessageToDify是一个独立的、可全局调用的函数
+                                                    // (Assuming sendMessageToDify is a standalone, globally callable function)
+                                                    // 如果它是事件监听器的一部分，则需要不同的测试策略或重构
+                                                    // (If it's part of an event listener, a different test strategy or refactoring would be needed)
+        window.switchToAnimation = switchToAnimation;
+        
+        // 暴露 isRecording 状态和动画名称常量，以便测试可以检查/模拟它们
+        // (Expose isRecording state and animation name constants so tests can check/mock them)
+        // 注意: 直接暴露 isRecording 状态用于测试可能表明需要更精细的状态管理或事件。
+        // (Note: Directly exposing isRecording state for testing might indicate a need for more refined state management or events.)
+        Object.defineProperty(window, 'isRecordingPublic', { // 使用 getter/setter 以避免意外的全局修改
+            get: function() { return isRecording; },
+            set: function(value) { isRecording = value; } // 允许测试设置它
+        });
+        window.LISTENING_ANIMATION_NAME_FOR_TEST = LISTENING_ANIMATION_NAME;
+        window.DEFAULT_ANIMATION_NAME_FOR_TEST = DEFAULT_ANIMATION_NAME;
+
+
+    </script>
+    <script src="tests.js"></script> <!-- 单元测试脚本 (Unit Test Script) -->
+    <button onclick="runUnitTests()" style="position:fixed; top:10px; right:10px; z-index:1000; padding: 8px 12px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">运行单元测试</button> <!-- (Run Unit Tests Button) -->
+</body>
+</html>
